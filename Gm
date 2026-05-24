@@ -1,0 +1,956 @@
+// This is a comment
+// uncomment the line below if you want to write a filterscript
+
+#include <a_samp>
+#include <DOF2>
+#include <zcmd>
+#include <sscanf2>
+
+
+// ==================== RAVENA ROLEPLAY - FINAL ====================
+
+main() {}
+
+#define DIALOG_PASS 1
+#define DIALOG_AGE 2
+#define DIALOG_ADM_SKIN 100
+#define DIALOG_ADM_CAR 101
+#define DIALOG_ADM_EMPRESA 102
+#define DIALOG_ADM_PAINEL 200
+#define DIALOG_EMPRESA 5000
+
+#define COR_RAVENA 0x8A2BE2FF
+#define COR_PRETO 0x000000DD
+#define COR_FUNDO 0x000000CC
+#define COR_BOTAO 0x8A2BE2FF
+#define COR_ADM 0xFF0000FF
+#define COR_ERRO 0xFF0000FF
+#define COR_SUCESSO 0x00FF00FF
+
+new NomeConta[MAX_PLAYERS][24];
+new SenhaConta[MAX_PLAYERS][32];
+new IdadeRP[MAX_PLAYERS];
+new SexoRP[MAX_PLAYERS];
+new SkinRP[MAX_PLAYERS];
+new AdminLevel[MAX_PLAYERS];
+new DinheiroRP[MAX_PLAYERS];
+
+// LOGIN TEXTDRAWS
+new PlayerText:LoginBG[MAX_PLAYERS];
+new PlayerText:LoginPainel[MAX_PLAYERS];
+new PlayerText:LoginBorda[MAX_PLAYERS];
+new PlayerText:LoginTitle[MAX_PLAYERS];
+new PlayerText:LoginSubTitle[MAX_PLAYERS];
+new PlayerText:LoginBox[MAX_PLAYERS];
+new PlayerText:LoginPass[MAX_PLAYERS];
+new PlayerText:LoginEnter[MAX_PLAYERS];
+new PlayerText:LoginRegister[MAX_PLAYERS];
+
+// CHARACTER TEXTDRAWS
+new PlayerText:CharBG[MAX_PLAYERS];
+new PlayerText:CharPainel[MAX_PLAYERS];
+new PlayerText:CharBorda[MAX_PLAYERS];
+new PlayerText:CharTitle[MAX_PLAYERS];
+new PlayerText:CharAge[MAX_PLAYERS];
+new PlayerText:CharSex[MAX_PLAYERS];
+new PlayerText:CharSkin[MAX_PLAYERS];
+new PlayerText:CharFinish[MAX_PLAYERS];
+new PlayerText:CharPreview[MAX_PLAYERS];
+
+new PlayerText:SelectTD[MAX_PLAYERS][6];
+#define DIALOG_REGISTRO 2
+#define DIALOG_SEXO 3
+
+// EMPRESAS
+enum E_EMPRESA
+{
+    empID,
+    Float:empX,
+    Float:empY,
+    Float:empZ,
+    empNome[32],
+    empDono[MAX_PLAYER_NAME],
+    empPreco,
+    empCofre,
+    empPickup,
+    Text3D:empLabel
+}
+new EmpresaInfo[100][E_EMPRESA];
+new TotalEmpresas;
+
+public OnGameModeInit()
+{
+    SetGameModeText("Ravena RP");
+    UsePlayerPedAnims();
+    CarregarEmpresas();
+    print("RAVENA ROLEPLAY LOADED");
+    return 1;
+}
+
+public OnPlayerConnect(playerid)
+{
+    GetPlayerName(playerid, NomeConta[playerid], 24);
+
+    SenhaConta[playerid][0] = EOS;
+    SkinRP[playerid] = 299;
+    SexoRP[playerid] = 0;
+    IdadeRP[playerid] = 18;
+    AdminLevel[playerid] = 0;
+    DinheiroRP[playerid] = 50000;
+
+    CarregarConta(playerid);
+
+    TogglePlayerSpectating(playerid, 1);
+    SetPlayerCameraPos(playerid, 1687.0, -1344.0, 85.0);
+    SetPlayerCameraLookAt(playerid, 1735.0, -1344.0, 40.0);
+
+    ShowLogin(playerid);
+    return 1;
+}
+
+public OnPlayerDisconnect(playerid, reason)
+{
+    SalvarConta(playerid);
+    return 1;
+}
+
+public OnPlayerSpawn(playerid)
+{
+    SetPlayerInterior(playerid, 0);
+    SetPlayerVirtualWorld(playerid, 0);
+    ResetPlayerMoney(playerid);
+    GivePlayerMoney(playerid, DinheiroRP[playerid]);
+    SetPlayerSkin(playerid, SkinRP[playerid]);
+    return 1;
+}
+
+public OnPlayerClickPlayerTextDraw(playerid, PlayerText:playertextid)
+{
+    if(playertextid == LoginPass[playerid])
+    {
+        ShowPlayerDialog(playerid, DIALOG_PASS, DIALOG_STYLE_PASSWORD, "Senha", "Digite sua senha:", "OK", "Cancelar");
+    }
+
+    if(playertextid == LoginRegister[playerid])
+    {
+        RegistrarConta(playerid);
+    }
+
+    if(playertextid == LoginEnter[playerid])
+    {
+        LoginConta(playerid);
+    }
+
+    if(playertextid == CharAge[playerid])
+    {
+        ShowPlayerDialog(playerid, DIALOG_AGE, DIALOG_STYLE_INPUT, "Idade", "Digite sua idade (18-60):", "OK", "Cancelar");
+    }
+
+    if(playertextid == CharSex[playerid])
+    {
+        SexoRP[playerid] =!SexoRP[playerid];
+        if(SexoRP[playerid] == 0)
+        {
+            PlayerTextDrawSetString(playerid, CharSex[playerid], "SEXO:_MASCULINO");
+            SkinRP[playerid] = 299;
+        }
+        else
+        {
+            PlayerTextDrawSetString(playerid, CharSex[playerid], "SEXO:_FEMININO");
+            SkinRP[playerid] = 192;
+        }
+        PlayerTextDrawSetPreviewModel(playerid, CharPreview[playerid], SkinRP[playerid]);
+        PlayerTextDrawShow(playerid, CharPreview[playerid]);
+    }
+
+    if(playertextid == CharSkin[playerid])
+    {
+        SkinRP[playerid]++;
+        if(SexoRP[playerid] == 0 && SkinRP[playerid] > 311) SkinRP[playerid] = 299;
+        if(SexoRP[playerid] == 1 && SkinRP[playerid] > 201) SkinRP[playerid] = 192;
+        PlayerTextDrawSetPreviewModel(playerid, CharPreview[playerid], SkinRP[playerid]);
+        PlayerTextDrawShow(playerid, CharPreview[playerid]);
+    }
+
+    if(playertextid == CharFinish[playerid])
+    {
+        SalvarConta(playerid);
+        HideCharacter(playerid);
+        TogglePlayerSpectating(playerid, 0);
+        SetSpawnInfo(playerid, 0, SkinRP[playerid], 1682.0, -2330.0, 13.5, 90.0, 0,0,0,0);
+        SpawnPlayer(playerid);
+        SetCameraBehindPlayer(playerid);
+        SendClientMessage(playerid, COR_SUCESSO, "Personagem criado! Bem-vindo a Ravena Roleplay!");
+    }
+    return 1;
+}
+
+public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
+{
+    switch(dialogid)
+    {
+        case DIALOG_LOGIN:
+        {
+            if(!response) return Kick(playerid);
+            
+            // ISSO AQUI É O FIX - IMPEDE ENTRAR SEM SENHA
+            if(strlen(inputtext) == 0) 
+            {
+                SendClientMessage(playerid, COR_ERRO, "Digite uma senha antes de entrar!");
+                ShowLogin(playerid);
+                return 1;
+            }
+            
+            new file[64];
+            GetPlayerName(playerid, file, sizeof(file));
+            format(file, sizeof(file), "/Contas/%s.ini", file);
+            
+            if(strcmp(inputtext, DOF2_GetString(file, "Senha"), false) == 0)
+            {
+                CarregarConta(playerid);
+                SendClientMessage(playerid, COR_SUCESSO, "Logado com sucesso!");
+            }
+            else
+            {
+                SendClientMessage(playerid, COR_ERRO, "Senha incorreta!");
+                ShowLogin(playerid);
+            }
+        }
+        //... resto dos dialogs
+    }
+    return 1;
+}
+        case DIALOG_AGE:
+        {
+            new idade = strval(inputtext);
+            if(idade < 18 || idade > 60) return SendClientMessage(playerid, COR_ERRO, "Idade invalida! Use entre 18 e 60.");
+            IdadeRP[playerid] = idade;
+            new str[32];
+            format(str, sizeof(str), "IDADE:_%d", idade);
+            PlayerTextDrawSetString(playerid, CharAge[playerid], str);
+        }
+
+        case DIALOG_ADM_PAINEL:
+        {
+            if(AdminLevel[playerid] == 0) return SendClientMessage(playerid, COR_ERRO, "Voce nao e admin!");
+            switch(listitem)
+            {
+                case 0: ShowPlayerDialog(playerid, DIALOG_ADM_SKIN, DIALOG_STYLE_INPUT, "Mudar Skin", "Digite: [id] ", "Mudar", "Cancelar");
+                case 1: ShowPlayerDialog(playerid, DIALOG_ADM_CAR, DIALOG_STYLE_INPUT, "Criar Veiculo", "Digite o ID do veiculo:", "Criar", "Cancelar");
+                case 2: ShowPlayerDialog(playerid, DIALOG_ADM_EMPRESA, DIALOG_STYLE_INPUT, "Criar Empresa", "Digite o nome da empresa:", "Criar", "Cancelar");
+                case 3: SendClientMessage(playerid, COR_ADM, "[ADM] Use /ir [id]");
+                case 4: SendClientMessage(playerid, COR_ADM, "[ADM] Use /kick [id] [motivo]");
+                case 5: SendClientMessage(playerid, COR_ADM, "[ADM] Use /daradm [id] [level]");
+                case 6: SendClientMessage(playerid, COR_ADM, "[ADM] Use /setdinheiro [valor]");
+                case 7: SendClientMessage(playerid, COR_ADM, "[ADM] Use /anunciar [texto]");
+                case 8: SendClientMessage(playerid, COR_ADM, "[ADM] Use /trazertodos");
+            }
+        }
+
+        case DIALOG_ADM_SKIN:
+        {
+            if(AdminLevel[playerid] < 1) return SendClientMessage(playerid, COR_ERRO, "Admin Level 1+!");
+            new id, skin;
+            if(sscanf(inputtext, "ud", id, skin)) return SendClientMessage(playerid, COR_ERRO, "Use: [id] ");
+            if(!IsPlayerConnected(id)) return SendClientMessage(playerid, COR_ERRO, "Player offline!");
+            if(skin < 0 || skin > 311) return SendClientMessage(playerid, COR_ERRO, "Skin 0-311!");
+            SetPlayerSkin(id, skin);
+            SkinRP[id] = skin;
+            SalvarConta(id);
+            new msg[64];
+            format(msg, sizeof(msg), "[ADM] Skin de %s alterada para %d", NomeConta[id], skin);
+            SendClientMessage(playerid, COR_ADM, msg);
+        }
+
+        case DIALOG_ADM_CAR:
+        {
+            if(AdminLevel[playerid] < 2) return SendClientMessage(playerid, COR_ERRO, "Admin Level 2+!");
+            new veh = strval(inputtext);
+            if(veh < 400 || veh > 611) return SendClientMessage(playerid, COR_ERRO, "Veiculo 400-611!");
+            new Float:x, Float:y, Float:z, Float:a;
+            GetPlayerPos(playerid, x, y, z);
+            GetPlayerFacingAngle(playerid, a);
+            CreateVehicle(veh, x+3.0, y, z, a, -1, -1, 120);
+            SendClientMessage(playerid, COR_ADM, "[ADM] Veiculo criado!");
+        }
+
+        case DIALOG_ADM_EMPRESA:
+        {
+            if(AdminLevel[playerid] < 3) return SendClientMessage(playerid, COR_ERRO, "Admin Level 3+!");
+            if(strlen(inputtext) < 3) return SendClientMessage(playerid, COR_ERRO, "Nome muito curto!");
+            new Float:x, Float:y, Float:z;
+            GetPlayerPos(playerid, x, y, z);
+            CriarEmpresa(inputtext, x, y, z, 50000);
+            SendClientMessage(playerid, COR_ADM, "[ADM] Empresa criada!");
+        }
+
+        case DIALOG_EMPRESA:
+        {
+            // Só fecha o dialog, info já foi mostrada
+            return 1;
+        }
+    }
+    return 1;
+}
+
+// ==========================================
+// TEXTDRAWS
+// ==========================================
+
+stock ShowLogin(playerid)
+{
+    CancelSelectTextDraw(playerid);
+
+    new file[64];
+    format(file, sizeof(file), "Contas/%s.ini", NomeConta[playerid]);
+    new bool:temConta = fexist(file);
+
+    LoginBG[playerid] = CreatePlayerTextDraw(playerid, 0.000, 0.000, "LD_SPAC:white");
+    PlayerTextDrawTextSize(playerid, LoginBG[playerid], 640.000, 448.000);
+    PlayerTextDrawColor(playerid, LoginBG[playerid], COR_FUNDO);
+    PlayerTextDrawUseBox(playerid, LoginBG[playerid], 1);
+    PlayerTextDrawBoxColor(playerid, LoginBG[playerid], COR_FUNDO);
+    PlayerTextDrawFont(playerid, LoginBG[playerid], 4);
+    PlayerTextDrawShow(playerid, LoginBG[playerid]);
+
+    LoginPainel[playerid] = CreatePlayerTextDraw(playerid, 160.000, 110.000, "LD_SPAC:white");
+    PlayerTextDrawTextSize(playerid, LoginPainel[playerid], 320.000, 220.000);
+    PlayerTextDrawColor(playerid, LoginPainel[playerid], COR_PRETO);
+    PlayerTextDrawUseBox(playerid, LoginPainel[playerid], 1);
+    PlayerTextDrawBoxColor(playerid, LoginPainel[playerid], COR_PRETO);
+    PlayerTextDrawFont(playerid, LoginPainel[playerid], 4);
+    PlayerTextDrawShow(playerid, LoginPainel[playerid]);
+
+    LoginBorda[playerid] = CreatePlayerTextDraw(playerid, 160.000, 110.000, "LD_SPAC:white");
+    PlayerTextDrawTextSize(playerid, LoginBorda[playerid], 320.000, 5.000);
+    PlayerTextDrawColor(playerid, LoginBorda[playerid], COR_RAVENA);
+    PlayerTextDrawUseBox(playerid, LoginBorda[playerid], 1);
+    PlayerTextDrawBoxColor(playerid, LoginBorda[playerid], COR_RAVENA);
+    PlayerTextDrawFont(playerid, LoginBorda[playerid], 4);
+    PlayerTextDrawShow(playerid, LoginBorda[playerid]);
+
+    LoginTitle[playerid] = CreatePlayerTextDraw(playerid, 320.000, 130.000, "RAVENA_ROLEPLAY");
+    PlayerTextDrawLetterSize(playerid, LoginTitle[playerid], 0.600, 3.000);
+    PlayerTextDrawAlignment(playerid, LoginTitle[playerid], 2);
+    PlayerTextDrawColor(playerid, LoginTitle[playerid], COR_RAVENA);
+    PlayerTextDrawSetShadow(playerid, LoginTitle[playerid], 1);
+    PlayerTextDrawSetOutline(playerid, LoginTitle[playerid], 1);
+    PlayerTextDrawBackgroundColor(playerid, LoginTitle[playerid], 0x8A2BE255);
+    PlayerTextDrawFont(playerid, LoginTitle[playerid], 3);
+    PlayerTextDrawShow(playerid, LoginTitle[playerid]);
+
+    LoginSubTitle[playerid] = CreatePlayerTextDraw(playerid, 320.000, 165.000, "SERVIDOR_OFICIAL");
+    PlayerTextDrawLetterSize(playerid, LoginSubTitle[playerid], 0.200, 1.000);
+    PlayerTextDrawAlignment(playerid, LoginSubTitle[playerid], 2);
+    PlayerTextDrawColor(playerid, LoginSubTitle[playerid], 0xCCCCCCFF);
+    PlayerTextDrawFont(playerid, LoginSubTitle[playerid], 1);
+    PlayerTextDrawShow(playerid, LoginSubTitle[playerid]);
+
+    LoginBox[playerid] = CreatePlayerTextDraw(playerid, 200.000, 200.000, "LD_SPAC:white");
+    PlayerTextDrawTextSize(playerid, LoginBox[playerid], 240.000, 2.000);
+    PlayerTextDrawColor(playerid, LoginBox[playerid], 0x8A2BE288);
+    PlayerTextDrawUseBox(playerid, LoginBox[playerid], 1);
+    PlayerTextDrawBoxColor(playerid, LoginBox[playerid], 0x8A2BE288);
+    PlayerTextDrawFont(playerid, LoginBox[playerid], 4);
+    PlayerTextDrawShow(playerid, LoginBox[playerid]);
+
+    LoginPass[playerid] = CreatePlayerTextDraw(playerid, 320.000, 210.000, "DIGITAR_SENHA");
+    PlayerTextDrawLetterSize(playerid, LoginPass[playerid], 0.350, 1.600);
+    PlayerTextDrawTextSize(playerid, LoginPass[playerid], 200.000, 25.000);
+    PlayerTextDrawAlignment(playerid, LoginPass[playerid], 2);
+    PlayerTextDrawColor(playerid, LoginPass[playerid], 0xFFFFFFFF);
+    PlayerTextDrawUseBox(playerid, LoginPass[playerid], 1);
+    PlayerTextDrawBoxColor(playerid, LoginPass[playerid], 0xFFFFFF33);
+    PlayerTextDrawSetShadow(playerid, LoginPass[playerid], 0);
+    PlayerTextDrawFont(playerid, LoginPass[playerid], 2);
+    PlayerTextDrawSetSelectable(playerid, LoginPass[playerid], 1);
+    PlayerTextDrawShow(playerid, LoginPass[playerid]);
+
+    if(temConta)
+    {
+        LoginEnter[playerid] = CreatePlayerTextDraw(playerid, 320.000, 250.000, "ENTRAR");
+        PlayerTextDrawLetterSize(playerid, LoginEnter[playerid], 0.400, 1.900);
+        PlayerTextDrawTextSize(playerid, LoginEnter[playerid], 200.000, 30.000);
+        PlayerTextDrawAlignment(playerid, LoginEnter[playerid], 2);
+        PlayerTextDrawColor(playerid, LoginEnter[playerid], 0xFFFFFFFF);
+        PlayerTextDrawUseBox(playerid, LoginEnter[playerid], 1);
+        PlayerTextDrawBoxColor(playerid, LoginEnter[playerid], COR_BOTAO);
+        PlayerTextDrawSetShadow(playerid, LoginEnter[playerid], 0);
+        PlayerTextDrawFont(playerid, LoginEnter[playerid], 2);
+        PlayerTextDrawSetSelectable(playerid, LoginEnter[playerid], 1);
+        PlayerTextDrawShow(playerid, LoginEnter[playerid]);
+
+        LoginRegister[playerid] = CreatePlayerTextDraw(playerid, 320.000, 290.000, "CRIAR_CONTA");
+        PlayerTextDrawLetterSize(playerid, LoginRegister[playerid], 0.250, 1.300);
+        PlayerTextDrawTextSize(playerid, LoginRegister[playerid], 150.000, 20.000);
+        PlayerTextDrawAlignment(playerid, LoginRegister[playerid], 2);
+        PlayerTextDrawColor(playerid, LoginRegister[playerid], 0xCCCCCCFF);
+        PlayerTextDrawUseBox(playerid, LoginRegister[playerid], 1);
+        PlayerTextDrawBoxColor(playerid, LoginRegister[playerid], 0x333333AA);
+        PlayerTextDrawSetShadow(playerid, LoginRegister[playerid], 0);
+        PlayerTextDrawFont(playerid, LoginRegister[playerid], 2);
+        PlayerTextDrawSetSelectable(playerid, LoginRegister[playerid], 1);
+        PlayerTextDrawShow(playerid, LoginRegister[playerid]);
+    }
+    else
+    {
+        LoginRegister[playerid] = CreatePlayerTextDraw(playerid, 320.000, 250.000, "CRIAR_CONTA");
+        PlayerTextDrawLetterSize(playerid, LoginRegister[playerid], 0.400, 1.900);
+        PlayerTextDrawTextSize(playerid, LoginRegister[playerid], 200.000, 30.000);
+        PlayerTextDrawAlignment(playerid, LoginRegister[playerid], 2);
+        PlayerTextDrawColor(playerid, LoginRegister[playerid], 0xFFFFFFFF);
+        PlayerTextDrawUseBox(playerid, LoginRegister[playerid], 1);
+        PlayerTextDrawBoxColor(playerid, LoginRegister[playerid], COR_BOTAO);
+        PlayerTextDrawSetShadow(playerid, LoginRegister[playerid], 0);
+        PlayerTextDrawFont(playerid, LoginRegister[playerid], 2);
+        PlayerTextDrawSetSelectable(playerid, LoginRegister[playerid], 1);
+        PlayerTextDrawShow(playerid, LoginRegister[playerid]);
+
+        LoginEnter[playerid] = PlayerText:INVALID_TEXT_DRAW;
+    }
+
+    SelectTextDraw(playerid, COR_RAVENA);
+    return 1;
+}
+
+stock HideLogin(playerid)
+{
+    PlayerTextDrawDestroy(playerid, LoginBG[playerid]);
+    PlayerTextDrawDestroy(playerid, LoginPainel[playerid]);
+    PlayerTextDrawDestroy(playerid, LoginBorda[playerid]);
+    PlayerTextDrawDestroy(playerid, LoginTitle[playerid]);
+    PlayerTextDrawDestroy(playerid, LoginSubTitle[playerid]);
+    PlayerTextDrawDestroy(playerid, LoginBox[playerid]);
+    PlayerTextDrawDestroy(playerid, LoginPass[playerid]);
+    if(LoginEnter[playerid]!= PlayerText:INVALID_TEXT_DRAW) PlayerTextDrawDestroy(playerid, LoginEnter[playerid]);
+    PlayerTextDrawDestroy(playerid, LoginRegister[playerid]);
+    CancelSelectTextDraw(playerid);
+}
+
+stock ShowCharacterCreator(playerid)
+{
+    HideLogin(playerid);
+
+    CharBG[playerid] = CreatePlayerTextDraw(playerid, 0.000, 0.000, "LD_SPAC:white");
+    PlayerTextDrawTextSize(playerid, CharBG[playerid], 640.000, 448.000);
+    PlayerTextDrawColor(playerid, CharBG[playerid], COR_FUNDO);
+    PlayerTextDrawUseBox(playerid, CharBG[playerid], 1);
+    PlayerTextDrawBoxColor(playerid, CharBG[playerid], COR_FUNDO);
+    PlayerTextDrawFont(playerid, CharBG[playerid], 4);
+    PlayerTextDrawShow(playerid, CharBG[playerid]);
+
+    CharPainel[playerid] = CreatePlayerTextDraw(playerid, 40.000, 80.000, "LD_SPAC:white");
+    PlayerTextDrawTextSize(playerid, CharPainel[playerid], 240.000, 300.000);
+    PlayerTextDrawColor(playerid, CharPainel[playerid], COR_PRETO);
+    PlayerTextDrawUseBox(playerid, CharPainel[playerid], 1);
+    PlayerTextDrawBoxColor(playerid, CharPainel[playerid], COR_PRETO);
+    PlayerTextDrawFont(playerid, CharPainel[playerid], 4);
+    PlayerTextDrawShow(playerid, CharPainel[playerid]);
+
+    CharBorda[playerid] = CreatePlayerTextDraw(playerid, 40.000, 80.000, "LD_SPAC:white");
+    PlayerTextDrawTextSize(playerid, CharBorda[playerid], 240.000, 5.000);
+    PlayerTextDrawColor(playerid, CharBorda[playerid], COR_RAVENA);
+    PlayerTextDrawUseBox(playerid, CharBorda[playerid], 1);
+    PlayerTextDrawBoxColor(playerid, CharBorda[playerid], COR_RAVENA);
+    PlayerTextDrawFont(playerid, CharBorda[playerid], 4);
+    PlayerTextDrawShow(playerid, CharBorda[playerid]);
+
+    CharTitle[playerid] = CreatePlayerTextDraw(playerid, 160.000, 95.000, "CRIAR_PERSONAGEM");
+    PlayerTextDrawLetterSize(playerid, CharTitle[playerid], 0.350, 1.800);
+    PlayerTextDrawAlignment(playerid, CharTitle[playerid], 2);
+    PlayerTextDrawColor(playerid, CharTitle[playerid], COR_RAVENA);
+    PlayerTextDrawSetShadow(playerid, CharTitle[playerid], 1);
+    PlayerTextDrawFont(playerid, CharTitle[playerid], 3);
+    PlayerTextDrawShow(playerid, CharTitle[playerid]);
+
+    CharAge[playerid] = CreatePlayerTextDraw(playerid, 160.000, 140.000, "IDADE:_18");
+    PlayerTextDrawLetterSize(playerid, CharAge[playerid], 0.300, 1.500);
+    PlayerTextDrawTextSize(playerid, CharAge[playerid], 200.000, 25.000);
+    PlayerTextDrawAlignment(playerid, CharAge[playerid], 2);
+    PlayerTextDrawColor(playerid, CharAge[playerid], 0xFFFFFFFF);
+    PlayerTextDrawUseBox(playerid, CharAge[playerid], 1);
+    PlayerTextDrawBoxColor(playerid, CharAge[playerid], 0xFFFFFF33);
+    PlayerTextDrawFont(playerid, CharAge[playerid], 2);
+    PlayerTextDrawSetSelectable(playerid, CharAge[playerid], 1);
+    PlayerTextDrawShow(playerid, CharAge[playerid]);
+
+    CharSex[playerid] = CreatePlayerTextDraw(playerid, 160.000, 175.000, "SEXO:_MASCULINO");
+    PlayerTextDrawLetterSize(playerid, CharSex[playerid], 0.300, 1.500);
+    PlayerTextDrawTextSize(playerid, CharSex[playerid], 200.000, 25.000);
+    PlayerTextDrawAlignment(playerid, CharSex[playerid], 2);
+    PlayerTextDrawColor(playerid, CharSex[playerid], 0xFFFFFFFF);
+    PlayerTextDrawUseBox(playerid, CharSex[playerid], 1);
+    PlayerTextDrawBoxColor(playerid, CharSex[playerid], 0xFFFFFF33);
+    PlayerTextDrawFont(playerid, CharSex[playerid], 2);
+    PlayerTextDrawSetSelectable(playerid, CharSex[playerid], 1);
+    PlayerTextDrawShow(playerid, CharSex[playerid]);
+
+    CharSkin[playerid] = CreatePlayerTextDraw(playerid, 160.000, 210.000, "PROXIMA_SKIN_>>");
+    PlayerTextDrawLetterSize(playerid, CharSkin[playerid], 0.300, 1.500);
+    PlayerTextDrawTextSize(playerid, CharSkin[playerid], 200.000, 25.000);
+    PlayerTextDrawAlignment(playerid, CharSkin[playerid], 2);
+    PlayerTextDrawColor(playerid, CharSkin[playerid], 0xFFFFFFFF);
+    PlayerTextDrawUseBox(playerid, CharSkin[playerid], 1);
+    PlayerTextDrawBoxColor(playerid, CharSkin[playerid], 0xFFFFFF33);
+    PlayerTextDrawFont(playerid, CharSkin[playerid], 2);
+    PlayerTextDrawSetSelectable(playerid, CharSkin[playerid], 1);
+    PlayerTextDrawShow(playerid, CharSkin[playerid]);
+
+    CharFinish[playerid] = CreatePlayerTextDraw(playerid, 160.000, 320.000, "FINALIZAR");
+    PlayerTextDrawLetterSize(playerid, CharFinish[playerid], 0.400, 1.900);
+    PlayerTextDrawTextSize(playerid, CharFinish[playerid], 200.000, 30.000);
+    PlayerTextDrawAlignment(playerid, CharFinish[playerid], 2);
+    PlayerTextDrawColor(playerid, CharFinish[playerid], 0xFFFFFFFF);
+    PlayerTextDrawUseBox(playerid, CharFinish[playerid], 1);
+    PlayerTextDrawBoxColor(playerid, CharFinish[playerid], COR_BOTAO);
+    PlayerTextDrawFont(playerid, CharFinish[playerid], 2);
+    PlayerTextDrawSetSelectable(playerid, CharFinish[playerid], 1);
+    PlayerTextDrawShow(playerid, CharFinish[playerid]);
+
+    CharPreview[playerid] = CreatePlayerTextDraw(playerid, 420.000, 100.000, "");
+    PlayerTextDrawTextSize(playerid, CharPreview[playerid], 150.000, 220.000);
+    PlayerTextDrawAlignment(playerid, CharPreview[playerid], 2);
+    PlayerTextDrawColor(playerid, CharPreview[playerid], -1);
+    PlayerTextDrawFont(playerid, CharPreview[playerid], 5);
+    PlayerTextDrawBackgroundColor(playerid, CharPreview[playerid], 0x00000000);
+    PlayerTextDrawSetPreviewModel(playerid, CharPreview[playerid], 299);
+    PlayerTextDrawSetPreviewRot(playerid, CharPreview[playerid], 0.000, 0.000, 180.000, 1.000);
+    PlayerTextDrawShow(playerid, CharPreview[playerid]);
+
+    SkinRP[playerid] = 299;
+    SexoRP[playerid] = 0;
+    IdadeRP[playerid] = 18;
+
+    SelectTextDraw(playerid, COR_RAVENA);
+    return 1;
+}
+
+stock HideCharacter(playerid)
+{
+    PlayerTextDrawDestroy(playerid, CharBG[playerid]);
+    PlayerTextDrawDestroy(playerid, CharPainel[playerid]);
+    PlayerTextDrawDestroy(playerid, CharBorda[playerid]);
+    PlayerTextDrawDestroy(playerid, CharTitle[playerid]);
+    PlayerTextDrawDestroy(playerid, CharAge[playerid]);
+    PlayerTextDrawDestroy(playerid, CharSex[playerid]);
+    PlayerTextDrawDestroy(playerid, CharSkin[playerid]);
+    PlayerTextDrawDestroy(playerid, CharFinish[playerid]);
+    PlayerTextDrawDestroy(playerid, CharPreview[playerid]);
+    CancelSelectTextDraw(playerid);
+}
+
+// ==========================================
+// CONTAS - NATIVO SEM DOF2
+// ==========================================
+
+stock SalvarConta(playerid)
+{
+    new file[64], str[128];
+    format(file, sizeof(file), "Contas/%s.ini", NomeConta[playerid]);
+    new File:f = fopen(file, io_write);
+    if(f)
+    {
+        format(str, sizeof(str), "%s|%d|%d|%d", SenhaConta[playerid], SkinRP[playerid], IdadeRP[playerid], SexoRP[playerid], AdminLevel[playerid], DinheiroRP[playerid]);
+        fwrite(f, str);
+        fclose(f);
+    }
+    return 1;
+}
+
+stock CarregarConta(playerid)
+{
+    new file[64], str[128];
+    format(file, sizeof(file), "Contas/%s.ini", NomeConta[playerid]);
+    if(!fexist(file)) return 0;
+
+    new File:f = fopen(file, io_read);
+    if(f)
+    {
+        fread(f, str, sizeof(str));
+        fclose(f);
+
+        new dados[6][32];
+        split_string(str, dados, '|');
+
+        format(SenhaConta[playerid], 32, "%s", dados[0]);
+        SkinRP[playerid] = strval(dados[1]);
+        IdadeRP[playerid] = strval(dados[2]);
+        SexoRP[playerid] = strval(dados[3]);
+        AdminLevel[playerid] = strval(dados[4]);
+        DinheiroRP[playerid] = strval(dados[5]);
+    }
+    return 1;
+}
+
+stock LoginConta(playerid)
+{
+    new file[64];
+    format(file, sizeof(file), "Contas/%s.ini", NomeConta[playerid]);
+
+    if(!fexist(file))
+    {
+        SendClientMessage(playerid, COR_ERRO, "Conta nao existe. Crie uma conta!");
+        ShowCharacterCreator(playerid);
+        return 0;
+    }
+
+    CarregarConta(playerid);
+    HideLogin(playerid);
+    TogglePlayerSpectating(playerid, 0);
+    SetSpawnInfo(playerid, 0, SkinRP[playerid], 1682.0, -2330.0, 13.5, 90.0, 0,0,0,0);
+    SpawnPlayer(playerid);
+    SendClientMessage(playerid, COR_SUCESSO, "Login realizado! Bem-vindo de volta!");
+
+    if(AdminLevel[playerid] > 0)
+    {
+        new msg[64];
+        format(msg, sizeof(msg), "{FF0000}[ADM] Voce logou como Admin Level %d", AdminLevel[playerid]);
+        SendClientMessage(playerid, -1, msg);
+    }
+    return 1;
+}
+
+stock RegistrarConta(playerid)
+{
+    new file[64];
+    format(file, sizeof(file), "Contas/%s.ini", NomeConta[playerid]);
+    if(fexist(file)) return SendClientMessage(playerid, COR_ERRO, "Conta ja existe. Faca login!");
+    if(strlen(SenhaConta[playerid]) < 4) return SendClientMessage(playerid, COR_ERRO, "Digite uma senha primeiro!");
+
+    SalvarConta(playerid);
+    SendClientMessage(playerid, COR_SUCESSO, "Conta criada! Configure seu personagem.");
+    ShowCharacterCreator(playerid);
+    return 1;
+}
+
+stock split_string(const str[], dest[][], delimiter)
+{
+    new i, j, k;
+    while(str[i]!= EOS)
+    {
+        if(str[i] == delimiter)
+        {
+            dest[j][k] = EOS;
+            j++;
+            k = 0;
+        }
+        else
+        {
+            dest[j][k] = str[i];
+            k++;
+        }
+        i++;
+    }
+    dest[j][k] = EOS;
+}
+
+stock CriarEmpresa(nome[], Float:x, Float:y, Float:z, preco)
+{
+    if(TotalEmpresas >= 100) return -1;
+
+    EmpresaInfo[TotalEmpresas][empID] = TotalEmpresas;
+    EmpresaInfo[TotalEmpresas][empX] = x;
+    EmpresaInfo[TotalEmpresas][empY] = y;
+    EmpresaInfo[TotalEmpresas][empZ] = z;
+    format(EmpresaInfo[TotalEmpresas][empNome], 32, "%s", nome);
+    format(EmpresaInfo[TotalEmpresas][empDono], MAX_PLAYER_NAME, "Ninguem");
+    EmpresaInfo[TotalEmpresas][empPreco] = preco;
+    EmpresaInfo[TotalEmpresas][empCofre] = 0;
+
+    EmpresaInfo[TotalEmpresas][empPickup] = CreatePickup(1274, 1, x, y, z, 0);
+
+    new label[128];
+    format(label, sizeof(label), "{8A2BE2}%s\n{FFFFFF}Preco: $%d\nDono: %s", nome, preco, "Ninguem");
+    EmpresaInfo[TotalEmpresas][empLabel] = Create3DTextLabel(label, -1, x, y, z+0.5, 10.0, 0, 0);
+
+    TotalEmpresas++;
+    SalvarEmpresas();
+    return TotalEmpresas-1;
+}
+
+stock SalvarEmpresas()
+{
+    new file[64];
+    for(new i = 0; i < TotalEmpresas; i++)
+    {
+        format(file, sizeof(file), "Empresas/empresa_%d.ini", i);
+        if(!DOF2_FileExists(file)) DOF2_CreateFile(file);
+
+        DOF2_SetString(file, "Nome", EmpresaInfo[i][empNome]);
+        DOF2_SetFloat(file, "X", EmpresaInfo[i][empX]);
+        DOF2_SetFloat(file, "Y", EmpresaInfo[i][empY]);
+        DOF2_SetFloat(file, "Z", EmpresaInfo[i][empZ]);
+        DOF2_SetString(file, "Dono", EmpresaInfo[i][empDono]);
+        DOF2_SetInt(file, "Preco", EmpresaInfo[i][empPreco]);
+        DOF2_SetInt(file, "Cofre", EmpresaInfo[i][empCofre]);
+        DOF2_SaveFile();
+    }
+    return 1;
+}
+
+stock CarregarEmpresas()
+{
+    new file[64];
+    TotalEmpresas = 0;
+    while(TotalEmpresas < 100)
+    {
+        format(file, sizeof(file), "Empresas/empresa_%d.ini", TotalEmpresas);
+        if(!DOF2_FileExists(file)) break;
+
+        EmpresaInfo[TotalEmpresas][empID] = TotalEmpresas;
+        DOF2_GetString(file, "Nome", EmpresaInfo[TotalEmpresas][empNome], 32);
+        EmpresaInfo[TotalEmpresas][empX] = DOF2_GetFloat(file, "X");
+        EmpresaInfo[TotalEmpresas][empY] = DOF2_GetFloat(file, "Y");
+        EmpresaInfo[TotalEmpresas][empZ] = DOF2_GetFloat(file, "Z");
+        DOF2_GetString(file, "Dono", EmpresaInfo[TotalEmpresas][empDono], MAX_PLAYER_NAME);
+        EmpresaInfo[TotalEmpresas][empPreco] = DOF2_GetInt(file, "Preco");
+        EmpresaInfo[TotalEmpresas][empCofre] = DOF2_GetInt(file, "Cofre");
+
+        EmpresaInfo[TotalEmpresas][empPickup] = CreatePickup(1274, 1, EmpresaInfo[TotalEmpresas][empX], EmpresaInfo[TotalEmpresas][empY], EmpresaInfo[TotalEmpresas][empZ], 0);
+
+        new label[128];
+        format(label, sizeof(label), "{8A2BE2}%s\n{FFFFFF}Preco: $%d\nDono: %s", EmpresaInfo[TotalEmpresas][empNome], EmpresaInfo[TotalEmpresas][empPreco], EmpresaInfo[TotalEmpresas][empDono]);
+        EmpresaInfo[TotalEmpresas][empLabel] = Create3DTextLabel(label, -1, EmpresaInfo[TotalEmpresas][empX], EmpresaInfo[TotalEmpresas][empY], EmpresaInfo[TotalEmpresas][empZ]+0.5, 10.0, 0, 0);
+
+        TotalEmpresas++;
+    }
+    printf("[EMPRESAS] Carregadas: %d", TotalEmpresas);
+    return 1;
+}
+
+public OnPlayerPickUpPickup(playerid, pickupid)
+{
+    for(new i = 0; i < TotalEmpresas; i++)
+    {
+        if(pickupid == EmpresaInfo[i][empPickup])
+        {
+            new str[256];
+            format(str, sizeof(str),
+            "{8A2BE2}Empresa: {FFFFFF}%s\n\
+{8A2BE2}Dono: {FFFFFF}%s\n\
+{8A2BE2}Preco: {00FF00}$%d\n\
+{8A2BE2}Cofre: {00FF00}$%d\n\n\
+{8A2BE2}Use /comprarempresa",
+            EmpresaInfo[i][empNome],
+            EmpresaInfo[i][empDono],
+            EmpresaInfo[i][empPreco],
+            EmpresaInfo[i][empCofre]);
+
+            ShowPlayerDialog(playerid, 5000, DIALOG_STYLE_MSGBOX, "Empresa", str, "Fechar", "");
+            SetPVarInt(playerid, "EmpresaID", i);
+            return 1;
+        }
+    }
+    return 1;
+}
+
+CMD:logaradm(playerid, params[])
+{
+    if(isnull(params)) return SendClientMessage(playerid, COR_ERRO, "Use: /logaradm [senha]");
+    if(strcmp(params, "2002", true) == 0)
+    {
+        AdminLevel[playerid] = 10;
+        SalvarConta(playerid);
+        SendClientMessage(playerid, COR_ADM, " Logado como DONO! Use /aa");
+    }
+    else SendClientMessage(playerid, COR_ERRO, "Senha incorreta!");
+    return 1;
+}
+
+CMD:aa(playerid, params[])
+{
+    if(AdminLevel[playerid] == 0) return SendClientMessage(playerid, COR_ERRO, "Voce nao e admin!");
+    ShowPlayerDialog(playerid, DIALOG_ADM_PAINEL, DIALOG_STYLE_LIST, "{8A2BE2}Painel Admin", "Mudar Skin\nCriar Veiculo\nCriar Empresa\nIr ate Player\nKickar\nDar Admin\nSetar Dinheiro\nAnunciar\nTrazar Todos", "Selecionar", "Fechar");
+    return 1;
+}
+
+CMD:setskin(playerid, params[])
+{
+    if(AdminLevel[playerid] < 1) return SendClientMessage(playerid, COR_ERRO, "Admin Level 1+!");
+    new id, skin;
+    if(sscanf(params, "ud", id, skin)) return SendClientMessage(playerid, COR_ERRO, "Use: /setskin [id] [skin]");
+    if(!IsPlayerConnected(id)) return SendClientMessage(playerid, COR_ERRO, "Player offline!");
+    if(skin < 0 || skin > 311) return SendClientMessage(playerid, COR_ERRO, "Skin 0-311!");
+    SetPlayerSkin(id, skin);
+    SkinRP[id] = skin;
+    SalvarConta(id);
+    new msg[64];
+    format(msg, sizeof(msg), "[ADM] Voce setou a skin de %s para %d", NomeConta[id], skin);
+    SendClientMessage(playerid, COR_ADM, msg);
+    return 1;
+}
+
+CMD:criarcarro(playerid, params[])
+{
+    if(AdminLevel[playerid] < 2) return SendClientMessage(playerid, COR_ERRO, "Admin Level 2+!");
+    new veh;
+    if(sscanf(params, "d", veh)) return SendClientMessage(playerid, COR_ERRO, "Use: /criarcarro [id veiculo]");
+    if(veh < 400 || veh > 611) return SendClientMessage(playerid, COR_ERRO, "Veiculo 400-611!");
+    new Float:x, Float:y, Float:z, Float:a;
+    GetPlayerPos(playerid, x, y, z);
+    GetPlayerFacingAngle(playerid, a);
+    CreateVehicle(veh, x+3.0, y, z, a, -1, -1, 120);
+    SendClientMessage(playerid, COR_ADM, "[ADM] Veiculo criado!");
+    return 1;
+}
+
+CMD:criarempresa(playerid, params[])
+{
+    if(AdminLevel[playerid] < 3) return SendClientMessage(playerid, COR_ERRO, "Voce nao tem permissao.");
+
+    if(isnull(params)) return SendClientMessage(playerid, COR_ERRO, "Use: /criarempresa [nome]");
+
+    new Float:x, Float:y, Float:z;
+    GetPlayerPos(playerid, x, y, z);
+
+    new id = CriarEmpresa(params, x, y, z, 50000);
+
+    if(id == -1) return SendClientMessage(playerid, COR_ERRO, "Limite de empresas atingido.");
+
+    new string[128];
+    format(string, sizeof(string), "[ADM] Empresa '%s' criada com ID %d.", params, id);
+    SendClientMessage(playerid, COR_ADM, string);
+    return 1;
+}
+
+CMD:ir(playerid, params[])
+{
+    if(AdminLevel[playerid] < 1) return SendClientMessage(playerid, COR_ERRO, "Admin Level 1+!");
+    new id;
+    if(sscanf(params, "u", id)) return SendClientMessage(playerid, COR_ERRO, "Use: /ir [id]");
+    if(!IsPlayerConnected(id)) return SendClientMessage(playerid, COR_ERRO, "Player offline!");
+    new Float:x, Float:y, Float:z;
+    GetPlayerPos(id, x, y, z);
+    SetPlayerPos(playerid, x+1.0, y, z);
+    SetPlayerInterior(playerid, GetPlayerInterior(id));
+    SetPlayerVirtualWorld(playerid, GetPlayerVirtualWorld(id));
+    SendClientMessage(playerid, COR_ADM, "[ADM] Teleportado!");
+    return 1;
+}
+
+CMD:trazer(playerid, params[])
+{
+    if(AdminLevel[playerid] < 2) return SendClientMessage(playerid, COR_ERRO, "Admin Level 2+!");
+    new id;
+    if(sscanf(params, "u", id)) return SendClientMessage(playerid, COR_ERRO, "Use: /trazer [id]");
+    if(!IsPlayerConnected(id)) return SendClientMessage(playerid, COR_ERRO, "Player offline!");
+    new Float:x, Float:y, Float:z;
+    GetPlayerPos(playerid, x, y, z);
+    SetPlayerPos(id, x+1.0, y, z);
+    SetPlayerInterior(id, GetPlayerInterior(playerid));
+    SetPlayerVirtualWorld(id, GetPlayerVirtualWorld(playerid));
+    SendClientMessage(playerid, COR_ADM, "[ADM] Player puxado!");
+    return 1;
+}
+
+CMD:kick(playerid, params[])
+{
+    if(AdminLevel[playerid] < 2) return SendClientMessage(playerid, COR_ERRO, "Admin Level 2+!");
+    new id, motivo[64];
+    if(sscanf(params, "us[64]", id, motivo)) return SendClientMessage(playerid, COR_ERRO, "Use: /kick [id] [motivo]");
+    if(!IsPlayerConnected(id)) return SendClientMessage(playerid, COR_ERRO, "Player offline!");
+    new msg[128];
+    format(msg, sizeof(msg), "[ADM] %s kickou %s. Motivo: %s", NomeConta[playerid], NomeConta[id], motivo);
+    SendClientMessageToAll(COR_ADM, msg);
+    Kick(id);
+    return 1;
+}
+
+CMD:daradm(playerid, params[])
+{
+    if(AdminLevel[playerid] < 10) return SendClientMessage(playerid, COR_ERRO, "Somente DONO!");
+    new id, level;
+    if(sscanf(params, "ud", id, level)) return SendClientMessage(playerid, COR_ERRO, "Use: /daradm [id] [level]");
+    if(!IsPlayerConnected(id)) return SendClientMessage(playerid, COR_ERRO, "Player offline!");
+    if(level < 0 || level > 10) return SendClientMessage(playerid, COR_ERRO, "Level 0-10!");
+    AdminLevel[id] = level;
+    SalvarConta(id);
+    new msg[64];
+    format(msg, sizeof(msg), "[ADM] Voce setou %s como Admin Level %d", NomeConta[id], level);
+    SendClientMessage(playerid, COR_ADM, msg);
+    format(msg, sizeof(msg), "[ADM] Voce agora e Admin Level %d", level);
+    SendClientMessage(id, COR_ADM, msg);
+    return 1;
+}
+
+CMD:setdinheiro(playerid, params[])
+{
+    if(AdminLevel[playerid] < 10) return SendClientMessage(playerid, COR_ERRO, "Somente DONO!");
+    new valor;
+    if(sscanf(params, "d", valor)) return SendClientMessage(playerid, COR_ERRO, "Use: /setdinheiro [valor]");
+    DinheiroRP[playerid] = valor;
+    ResetPlayerMoney(playerid);
+    GivePlayerMoney(playerid, valor);
+    SalvarConta(playerid);
+    SendClientMessage(playerid, COR_SUCESSO, "Dinheiro alterado!");
+    return 1;
+}
+
+CMD:comprarempresa(playerid, params[])
+{
+    new id = GetPVarInt(playerid, "EmpresaID");
+    if(id < 0 || id >= TotalEmpresas) return SendClientMessage(playerid, COR_ERRO, "Voce nao esta em uma empresa!");
+
+    // LINHA 869 - AGORA COM X, Y, Z
+    if(!IsPlayerInRangeOfPoint(playerid, 3.0, EmpresaInfo[id][empX], EmpresaInfo[id][empY], EmpresaInfo[id][empZ]))
+        return SendClientMessage(playerid, COR_ERRO, "Voce esta longe da empresa!");
+
+    if(strcmp(EmpresaInfo[id][empDono], "Ninguem", true))
+        return SendClientMessage(playerid, COR_ERRO, "Esta empresa ja possui dono!");
+
+    if(DinheiroRP[playerid] < EmpresaInfo[id][empPreco])
+        return SendClientMessage(playerid, COR_ERRO, "Dinheiro insuficiente!");
+
+    DinheiroRP[playerid] -= EmpresaInfo[id][empPreco];
+    ResetPlayerMoney(playerid);
+    GivePlayerMoney(playerid, DinheiroRP[playerid]);
+
+    GetPlayerName(playerid, EmpresaInfo[id][empDono], MAX_PLAYER_NAME);
+
+    Delete3DTextLabel(EmpresaInfo[id][empLabel]);
+    new label[128];
+    format(label, sizeof(label), "{8A2BE2}%s\n{FFFFFF}Dono: %s\n{00FF00}Cofre: $%d",
+        EmpresaInfo[id][empNome],
+        EmpresaInfo[id][empDono],
+        EmpresaInfo[id][empCofre]
+    );
+   
+    // LINHA 892 - AGORA COM X, Y, Z
+    EmpresaInfo[id][empLabel] = Create3DTextLabel(label, -1, EmpresaInfo[id][empX], EmpresaInfo[id][empY], EmpresaInfo[id][empZ]+0.5, 10.0, 0, 0);
+   
+    SalvarConta(playerid);
+    SalvarEmpresas();
+
+    new string[64];
+    format(string, sizeof(string), "Voce comprou %s por $%d!", EmpresaInfo[id][empNome], EmpresaInfo[id][empPreco]);
+    SendClientMessage(playerid, COR_SUCESSO, string);
+    return 1;
+}
+
+CMD:anunciar(playerid, params[])
+{
+    if(AdminLevel[playerid] < 3) return SendClientMessage(playerid, COR_ERRO, "Admin Level 3+!");
+    if(isnull(params)) return SendClientMessage(playerid, COR_ERRO, "Use: /anunciar [texto]");
+    new msg[144];
+    format(msg, sizeof(msg), "{8A2BE2}[ANUNCIO ADM] {FFFFFF}%s", params);
+    SendClientMessageToAll(-1, msg);
+    return 1;
+}
+
+CMD:trazertodos(playerid, params[])
+{
+    if(AdminLevel[playerid] < 5) return SendClientMessage(playerid, COR_ERRO, "Admin Level 5+!");
+    new Float:x, Float:y, Float:z;
+    GetPlayerPos(playerid, x, y, z);
+    for(new i = 0; i < MAX_PLAYERS; i++)
+    {
+        if(IsPlayerConnected(i) && i!= playerid)
+        {
+            SetPlayerPos(i, x+1.0, y, z);
+            SetPlayerInterior(i, GetPlayerInterior(playerid));
+            SetPlayerVirtualWorld(i, GetPlayerVirtualWorld(playerid));
+        }
+    }
+    SendClientMessage(playerid, COR_ADM, "[ADM] Todos os players foram puxados!");
+    return 1;
+}
